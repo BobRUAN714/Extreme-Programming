@@ -4,6 +4,9 @@
       <el-button type="primary" @click="showAddDialog = true">
         Add Contact
       </el-button>
+      <el-button type="success" @click="exportToExcel">
+        Export to Excel
+      </el-button>
     </div>
 
     <el-table :data="sortedContacts" style="width: 100%; margin-top: 20px">
@@ -108,6 +111,8 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
 import { Star } from '@element-plus/icons-vue'
+import * as XLSX from 'xlsx'
+import FileSaver from 'file-saver'
 import 'element-plus/dist/index.css'
 
 interface Contact {
@@ -201,6 +206,43 @@ const saveContact = () => {
   editingContact.value = null
   currentContact.value = { names: [''], phones: [''], emails: [''], important: false }
   ElMessage.success('Contact saved successfully')
+}
+
+// 导出到Excel
+const exportToExcel = () => {
+  try {
+    const exportData = contacts.value.map(contact => {
+      return {
+        'Important': contact.important ? 'Yes' : 'No',
+        'Names': contact.names.join('; '),
+        'Phones': contact.phones.join('; '),
+        'Emails': contact.emails.join('; ')
+      }
+    })
+
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.json_to_sheet(exportData)
+
+    const colWidths = [
+      { wch: 10 }, // Important
+      { wch: 30 }, // Names
+      { wch: 30 }, // Phones
+      { wch: 40 }  // Emails
+    ]
+    ws['!cols'] = colWidths
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Contacts')
+
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+    const data = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+
+    FileSaver.saveAs(data, `contacts_${new Date().toISOString().split('T')[0]}.xlsx`)
+
+    ElMessage.success('Contacts exported successfully')
+  } catch (error) {
+    console.error('Export failed:', error)
+    ElMessage.error('Failed to export contacts')
+  }
 }
 </script>
 
