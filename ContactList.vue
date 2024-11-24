@@ -1,3 +1,4 @@
+
 <template>
   <div class="contact-list">
     <div class="button-group">
@@ -7,6 +8,15 @@
       <el-button type="success" @click="exportToExcel">
         Export to Excel
       </el-button>
+      <el-upload
+        class="excel-uploader"
+        accept=".xlsx,.xls"
+        :show-file-list="false"
+        :auto-upload="false"
+        :on-change="handleFileChange"
+      >
+        <el-button type="warning">Import from Excel</el-button>
+      </el-upload>
     </div>
 
     <el-table :data="sortedContacts" style="width: 100%; margin-top: 20px">
@@ -114,7 +124,6 @@ import { Star } from '@element-plus/icons-vue'
 import * as XLSX from 'xlsx'
 import FileSaver from 'file-saver'
 import 'element-plus/dist/index.css'
-
 interface Contact {
   id?: number
   names: string[]
@@ -244,6 +253,40 @@ const exportToExcel = () => {
     ElMessage.error('Failed to export contacts')
   }
 }
+
+// 处理文件导入
+const handleFileChange = async (file: any) => {
+  try {
+    const data = await file.raw.arrayBuffer()
+    const workbook = XLSX.read(data)
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+    const jsonData = XLSX.utils.sheet_to_json(worksheet)
+
+    const importedContacts: Contact[] = jsonData.map((row: any) => ({
+      id: Date.now() + Math.random(),
+      names: row['Names']?.split(';').map((name: string) => name.trim()) || [''],
+      phones: row['Phones']?.split(';').map((phone: string) => phone.trim()) || [''],
+      emails: row['Emails']?.split(';').map((email: string) => email.trim()) || [''],
+      important: row['Important']?.toLowerCase() === 'yes'
+    }))
+
+    const validContacts = importedContacts.filter(contact =>
+      contact.names[0] && contact.phones[0] && contact.emails[0]
+    )
+
+    if (validContacts.length === 0) {
+      ElMessage.error('No valid contacts found in the file')
+      return
+    }
+
+    contacts.value.push(...validContacts)
+
+    ElMessage.success(`Successfully imported ${validContacts.length} contacts`)
+  } catch (error) {
+    console.error('Import failed:', error)
+    ElMessage.error('Failed to import contacts. Please check your file format.')
+  }
+}
 </script>
 
 <style scoped>
@@ -265,5 +308,9 @@ const exportToExcel = () => {
 
 .el-button.is-circle {
   padding: 8px;
+}
+
+.excel-uploader {
+  display: inline-block;
 }
 </style>
